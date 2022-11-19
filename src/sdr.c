@@ -77,6 +77,12 @@ int __attribute__((weak)) rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
 
 #define GAIN_STR_MAX_SIZE 64
 
+#ifdef NDEBUG
+    #define debug_log(...)
+#else
+    #define debug_log(...)   fprintf(stderr, __VA_ARGS__)
+#endif
+
 struct sdr_dev {
     SOCKET rtl_tcp;
     uint32_t rtl_tcp_freq; ///< last known center frequency, rtl_tcp only.
@@ -557,7 +563,7 @@ static int rtlsdr_read_loop(sdr_dev_t *dev, sdr_event_cb_t cb, void *ctx, uint32
 #endif
             dev->running = 0;
         }
-        fprintf(stderr, "rtlsdr_read_loop: rtlsdr_read_async done\n");
+    debug_log("rtlsdr_read_loop: rtlsdr_read_async done\n");
 
     return r;
 }
@@ -1659,10 +1665,11 @@ void sdr_redirect_logging(void)
 static THREAD_RETURN THREAD_CALL acquire_thread(void *arg)
 {
     sdr_dev_t *dev = arg;
-    fprintf(stderr, "acquire_thread enter...\n");
+    debug_log("acquire_thread enter...\n");
 
     int r = sdr_start_sync(dev, dev->async_cb, dev->async_ctx, dev->buf_num, dev->buf_len);
-    fprintf(stderr, "acquire_thread async stop...\n");
+    // if (cfg->verbosity > 1)
+    debug_log("acquire_thread async stop...\n");
 
     if (r < 0) {
         fprintf(stderr, "WARNING: async read failed (%i).\n", r);
@@ -1673,7 +1680,7 @@ static THREAD_RETURN THREAD_CALL acquire_thread(void *arg)
 //    };
 //    dev->async_cb(&ev, dev->async_ctx);
 
-    fprintf(stderr, "acquire_thread done...\n");
+    debug_log("acquire_thread done...\n");
     return (void *)(intptr_t)r;
 }
 
@@ -1714,20 +1721,25 @@ int sdr_stop(sdr_dev_t *dev)
         return -1;
     }
 
-        fprintf(stderr, "%s: EXITING...\n", __func__);
-        pthread_mutex_lock(&dev->lock);
-        dev->exit_acquire = 1; // for rtl_tcp and SoapySDR
-        sdr_stop_sync(dev); // for rtlsdr
+    debug_log("%s: EXITING...\n", __func__);
+    pthread_mutex_lock(&dev->lock);
+    if (dev->exit_acquire) {
         pthread_mutex_unlock(&dev->lock);
+        debug_log("%s: Already exiting.\n", __func__);
+        return 0;
+    }
+    dev->exit_acquire = 1; // for rtl_tcp and SoapySDR
+    sdr_stop_sync(dev); // for rtlsdr
+    pthread_mutex_unlock(&dev->lock);
 
-        fprintf(stderr, "%s: JOINING...\n", __func__);
-        int r = pthread_join(dev->thread, NULL);
-        if (r) {
-            fprintf(stderr, "%s: error in pthread_join, rc: %d\n", __func__, r);
-        }
+    debug_log("%s: JOINING...\n", __func__);
+    int r = pthread_join(dev->thread, NULL);
+    if (r) {
+        fprintf(stderr, "%s: error in pthread_join, rc: %d\n", __func__, r);
+    }
 
-        fprintf(stderr, "%s: EXITED.\n", __func__);
-        return r;
+    debug_log("%s: EXITED.\n", __func__);
+    return r;
 }
 #else
 int sdr_start(sdr_dev_t *dev, sdr_event_cb_t cb, void *ctx, uint32_t buf_num, uint32_t buf_len)
