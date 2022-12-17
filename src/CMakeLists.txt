@@ -166,6 +166,7 @@ add_library(r_433 STATIC
     devices/nexus.c
     devices/nice_flor_s.c
     devices/norgo.c
+    devices/oil_smart.c
     devices/oil_standard.c
     devices/oil_watchman.c
     devices/opus_xt300.c
