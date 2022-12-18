@@ -23,10 +23,9 @@ Should apply to similar Watchman, Beckett, and Apollo devices too.
 There is a preamble plus de-sync of 555558, then MC coded an inner preamble of 5558 (raw 9999996a).
 End of frame is the last half-bit repeated additional 2 times, then 4 times mark.
 
-FIXME: confirm this
-The sensor sends a single packet once every hour or twice a second
-for 11 minutes when in pairing/test mode (pairing needs 35 sec).
-depth reading is in cm, lowest reading is ~3, highest is ~305, 0 is invalid
+The sensor sends a single packet once every half hour or twice a second
+for 5 minutes when in pairing/test mode.
+Depth reading is in cm, lowest reading is ~3, highest is ~305, 0 is invalid
 
 Data Format:
 
@@ -45,8 +44,9 @@ Data Layout:
 
 example packets are:
 
-raw: {158}555558 9999 996a 6559aaa99996a55696a9a5963c
-aligned: {134}9999996a 6559aaa999969aa6aa9a6995fc
+- raw: {158}555558 9999 996a 6559aaa99996a55696a9a5963c
+- aligned: {134}9999996a 6559aaa999969aa6aa9a6995 fc
+- decoded: 5558 bd01 5642 0497
 
 FIXME: this is not confirmed
 Start of frame full preamble is depending on first data bit either
@@ -89,25 +89,28 @@ static int oil_smart_decode(r_device *decoder, bitbuffer_t *bitbuffer, unsigned 
     // 0x20: (unknown toggle)
     // 0x40: (unknown toggle)
     // 0x80: (always zero?)
+
+    // idle flags are : 0x17
+    // counter value appears to change variously to: 0c 0e 10 12
     uint8_t flags = b[4];
     uint8_t alarm = b[5];
 
     // FIXME: confirm there is a binding counter
     uint16_t depth             = 0;
     uint16_t binding_countdown = 0;
-    if (flags & 1) {
+//    if (flags & 1) {
         // When binding, the countdown counts up from 0x40 to 0x4a
         // (as long as you hold the magnet to it for long enough)
         // before the device ID changes. The receiver unit needs
         // to receive this *strongly* in order to change its
         // allegiance.
-        binding_countdown = b[6];
-    }
-    else {
+//        binding_countdown = b[6];
+//    }
+//    else {
         // A depth reading of zero indicates no reading.
         //depth = ((b[5] & 0x02) << 7) | b[6];
         depth = b[6];
-    }
+//    }
 
     /* clang-format off */
     data_t *data = data_make(
